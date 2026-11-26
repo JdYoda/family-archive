@@ -475,12 +475,11 @@
       '<label for="phrase">Фраза-пароль</label>' +
       '<input id="phrase" class="search" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">' +
       '<label class="show"><input id="show" type="checkbox"> Показать фразу</label>' +
-      '<p class="note" id="note" style="display:none"></p>' +
+      '<p class="note" id="note"' + (note ? '' : ' style="display:none"') + '>' + esc(note || '') + '</p>' +
       '<button class="btn whob" type="submit" id="open">Открыть</button>' +
       '</form>';
     var field = document.getElementById('phrase'), button = document.getElementById('open'), box = document.getElementById('note');
     function say(text) { box.textContent = text; box.style.display = text ? '' : 'none'; }
-    if (note) say(note);
     document.getElementById('show').addEventListener('change', function (e) { field.type = e.target.checked ? 'text' : 'password'; });
     document.getElementById('unlock').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -490,8 +489,10 @@
       button.disabled = true;
       loadSite()
         .then(function (site) { return window.Vault.openSite(phrase, site.meta, site.bytes); })
-        .then(function (opened) { store('ft_key', opened.key); start(opened.data, cryptoMedia(opened.keys)); })
-        .catch(function (error) {
+        .then(function (opened) {
+          store('ft_key', opened.key);
+          start(opened.data, cryptoMedia(opened.keys));
+        }, function (error) {
           button.disabled = false;
           say(error && error.message === 'wrong-phrase'
             ? 'Фраза не подошла. Проверьте её и попробуйте ещё раз.'
@@ -506,6 +507,14 @@
   applyFont();
   window.FT = { matches: matches };
 
+  // Нет связи: сохранённый вход не трогаем, предлагаем повторить.
+  function showOffline() {
+    header('Наша семья', false);
+    main.innerHTML = '<div class="login"><h2>Нет связи</h2><p class="note">Сайт не загрузился. Проверьте интернет и нажмите «Повторить».</p>' +
+      '<button class="btn whob" type="button" id="retry">Повторить</button></div>';
+    document.getElementById('retry').addEventListener('click', boot);
+  }
+
   function boot() {
     if (window.FAMILY) { start(window.FAMILY, plainMedia()); return; }
     if (!window.crypto || !window.crypto.subtle || !window.Vault) {
@@ -517,10 +526,15 @@
     if (!key) { showUnlock(); return; }
     header('Наша семья', false);
     main.innerHTML = '<p class="count">Открываю…</p>';
-    loadSite()
-      .then(function (site) { return window.Vault.openWithKey(key, site.bytes); })
-      .then(function (opened) { start(opened.data, cryptoMedia(opened.keys)); })
-      .catch(function () { forget('ft_key'); showUnlock(); });
+    loadSite().then(function (site) {
+      return window.Vault.openWithKey(key, site.bytes).then(function (opened) {
+        start(opened.data, cryptoMedia(opened.keys));
+      }, function () {
+        // Ключ больше не открывает данные: фразу на сайте сменили.
+        forget('ft_key');
+        showUnlock('Фраза на сайте сменилась. Введите новую — её пришлёт Юра.');
+      });
+    }, showOffline);
   }
   boot();
 })();
