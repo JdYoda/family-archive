@@ -113,7 +113,9 @@
     }
     function viewPerson(id) {
       var p = P[id];
-      var face = p.photos.length ? picture(p.photos[0].thumb, 'ava', false) : '<div class="ava">' + esc(initials(p)) + '</div>';
+      // В кружок — только снимок одного человека: групповой обрезался бы по центру.
+      var portrait = p.photos.filter(function (photo) { return !photo.group; })[0];
+      var face = portrait ? picture(portrait.thumb, 'ava', false) : '<div class="ava">' + esc(initials(p)) + '</div>';
       var h = '<div class="hero">' + face + '<div><div class="nm">' + esc(p.name) + '</div><div class="yr">' + joinNonEmpty([esc(p.years), esc(p.place)], '<br>') + '</div></div></div>';
       h += '<div class="tags"><span class="tag">' + (id === viewer ? 'это вы' : 'Вам: ' + esc(kin(id))) + '</span>';
       if (p.badge === 'doc') h += '<span class="tag ok">есть документы</span>';
