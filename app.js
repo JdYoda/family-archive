@@ -471,7 +471,7 @@
     header('Наша семья', false);
     main.innerHTML = '<form id="unlock" class="login">' +
       '<h2>Вход для семьи</h2>' +
-      '<p>Введите фразу-пароль. Её вам пришлёт Юра. Телефон запомнит её, и в следующий раз вводить не придётся.</p>' +
+      '<p>Введите фразу-пароль. Её вам пришлёт Юра. Телефон запомнит вход. Если через какое-то время он снова спросит фразу, введите её ещё раз.</p>' +
       '<label for="phrase">Фраза-пароль</label>' +
       '<input id="phrase" class="search" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">' +
       '<label class="show"><input id="show" type="checkbox"> Показать фразу</label>' +
