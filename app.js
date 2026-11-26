@@ -517,12 +517,19 @@
     };
   }
 
+  // Отпечаток версии данных из страницы: свежая страница всегда берёт свои данные, а не старые из кэша.
+  function dataVersion() {
+    var meta = document.querySelector && document.querySelector('meta[name="data-version"]');
+    var value = meta && meta.getAttribute('content');
+    return value ? '?v=' + encodeURIComponent(value) : '';
+  }
   var siteFiles = null;
   function loadSite() {
     if (!siteFiles) {
+      var v = dataVersion();
       siteFiles = Promise.all([
-        fetch('site.json').then(function (r) { if (!r.ok) throw new Error('load'); return r.json(); }),
-        fetch('data.bin').then(function (r) { if (!r.ok) throw new Error('load'); return r.arrayBuffer(); })
+        fetch('site.json' + v).then(function (r) { if (!r.ok) throw new Error('load'); return r.json(); }),
+        fetch('data.bin' + v).then(function (r) { if (!r.ok) throw new Error('load'); return r.arrayBuffer(); })
       ]).then(function (all) { return { meta: all[0], bytes: all[1] }; });
       siteFiles.catch(function () { siteFiles = null; });
     }
