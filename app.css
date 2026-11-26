@@ -151,3 +151,5 @@ img.broken { min-height:60px; background:#ddd; }
 .sw { display:inline-block; width:18px; height:18px; border-radius:4px; flex:none; }
 .sw.pale { background:#eadbd0; border:2px dashed var(--hyp); box-sizing:border-box; } .sw.none { background:#e4dbcc; }
 nav a { font-size:16px; white-space:nowrap; padding-left:2px; padding-right:2px; }
+/* превью снимков людей: обрезка ближе к верху, чтобы голова попадала в кадр */
+.doc.photo img { object-position:50% 15%; }

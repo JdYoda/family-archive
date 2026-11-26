@@ -113,9 +113,8 @@
     }
     function viewPerson(id) {
       var p = P[id];
-      // В кружок — только снимок одного человека: групповой обрезался бы по центру.
-      var portrait = p.photos.filter(function (photo) { return !photo.group; })[0];
-      var face = portrait ? picture(portrait.thumb, 'ava', false) : '<div class="ava">' + esc(initials(p)) + '</div>';
+      // В кружке — снимок, выбранный пометкой «аватар»; без него — инициалы.
+      var face = p.face ? picture(p.face, 'ava', false) : '<div class="ava">' + esc(initials(p)) + '</div>';
       var h = '<div class="hero">' + face + '<div><div class="nm">' + esc(p.name) + '</div><div class="yr">' + joinNonEmpty([esc(p.years), esc(p.place)], '<br>') + '</div></div></div>';
       h += '<div class="tags"><span class="tag">' + (id === viewer ? 'это вы' : 'Вам: ' + esc(kin(id))) + '</span>';
       if (p.badge === 'doc') h += '<span class="tag ok">есть документы</span>';
@@ -133,7 +132,7 @@
       if (fam) h += '<h2>Семья</h2><div class="list">' + fam + '</div>';
       if (p.photos.length) {
         h += '<h2>Фотографии</h2><div class="docs">' + p.photos.map(function (photo) {
-          return '<a class="doc" data-view="' + esc(photo.web) + '">' + picture(photo.thumb, '', true) + '<div><b>' + esc(photo.caption) + '</b></div></a>';
+          return '<a class="doc photo" data-view="' + esc(photo.web) + '">' + picture(photo.thumb, '', true) + '<div><b>' + esc(photo.caption) + '</b></div></a>';
         }).join('') + '</div>';
       }
       if (p.docs.length) h += '<h2>Документы</h2><p class="count">Листов: ' + p.docs.length + '</p><div class="docs">' + p.docs.map(docCard).join('') + '</div>';
