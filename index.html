@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Наша семья</title>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="top">
+      <button class="back" id="back" aria-label="Назад">←</button>
+      <h1 id="title">Наша семья</h1>
+      <button class="fsz" id="fsz" aria-label="Размер букв">А+</button>
+    </div>
+    <nav id="nav">
+      <a href="#/tree" id="tab-tree">Дерево</a>
+      <a href="#/people" id="tab-people">Все люди</a>
+      <a href="#/questions" id="tab-questions">Вопросы</a>
+    </nav>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-bar"><button id="viewer-zoom">＋ Крупнее</button><button id="viewer-close">Закрыть</button></div>
+  <p class="viewer-wait" id="viewer-wait">Открываю…</p>
+  <div class="viewer-body"><img id="viewer-img" alt=""></div>
+</div>
+<script src="vault.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
