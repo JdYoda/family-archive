@@ -137,6 +137,7 @@
       if (p.docs.length) h += '<h2>Документы</h2><p class="count">Листов: ' + p.docs.length + '</p><div class="docs">' + p.docs.map(docCard).join('') + '</div>';
       if (p.unknown.length) h += '<h2>Чего мы пока не знаем</h2><ul class="unk">' + p.unknown.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
       h += '<a class="btn light" href="#/tree/' + id + '">Показать на дереве</a>';
+      if (parentRefs(id).length) h += '<a class="btn light" href="#/fan/' + id + '">Предки на веере</a>';
       h += '<p class="foot">Даты до 1918 года даны по старому стилю.</p>';
       return h;
     }
@@ -203,6 +204,121 @@
       return h;
     }
 
+    // Веер предков: место 1 — тот, от кого строим; у места s отец — 2s, мать — 2s+1.
+    var GEN_TITLES = ['', 'Родители', 'Бабушки и дедушки', 'Прабабушки и прадедушки', 'Прапрабабушки и прапрадедушки',
+      'Пятое поколение предков', 'Шестое поколение предков', 'Седьмое поколение предков', 'Восьмое поколение предков'];
+    var LINES = ['дедушка по отцу', 'бабушка по отцу', 'дедушка по матери', 'бабушка по матери'];
+    var MAX_GEN = 8, fan = null;
+    function genOf(s) { var g = 0; while (s > 1) { s >>= 1; g++; } return g; }
+    function ancestors(root) {
+      var slots = { 1: { id: root, hyp: false, alts: [] } }, depth = 0;
+      for (var g = 1; g <= MAX_GEN; g++) {
+        for (var s = 1 << g; s < 2 << g; s++) {
+          var child = slots[s >> 1];
+          if (!child || !child.id) continue;
+          var sex = s % 2 ? 'f' : 'm';
+          var refs = parentRefs(child.id).filter(function (ref) { return P[ref.id].sex === sex; });
+          if (refs.length) {
+            slots[s] = { id: refs[0].id, hyp: child.hyp || !!refs[0].hyp || refs.length > 1, alts: refs.slice(1).map(function (ref) { return ref.id; }) };
+            depth = g;
+          } else {
+            slots[s] = { id: '', hyp: false, alts: [] };
+          }
+        }
+      }
+      // Пустые места показываем только в тех поколениях, где кто-то уже найден.
+      Object.keys(slots).forEach(function (s) { if (!slots[s].id && genOf(Number(s)) > depth) delete slots[s]; });
+      return { root: root, slots: slots, depth: depth };
+    }
+    function fanRadii(depth) {
+      var weights = [0, 1.45, 1.4, 1.3, 1.15, 0.55, 0.45, 0.4, 0.35], total = 0, r = [72];
+      for (var g = 1; g <= depth; g++) total += weights[g];
+      for (g = 1; g <= depth; g++) r[g] = r[g - 1] + 428 * weights[g] / total;
+      return r;
+    }
+    function num(x) { return x.toFixed(1); }
+    function pt(r, a) { var rad = a * Math.PI / 180; return num(r * Math.cos(rad)) + ' ' + num(-r * Math.sin(rad)); }
+    function sector(r1, r2, a0, a1) {
+      return 'M' + pt(r2, a0) + 'A' + num(r2) + ' ' + num(r2) + ' 0 0 1 ' + pt(r2, a1) + 'L' + pt(r1, a1) +
+        'A' + num(r1) + ' ' + num(r1) + ' 0 0 0 ' + pt(r1, a0) + 'Z';
+    }
+    // Подпись сектора: в двух ближних кольцах — поперёк, дальше — вдоль радиуса. Не влезает — без подписи.
+    function fanLabel(lines, r1, r2, a0, a1, g, dark) {
+      var mid = (a0 + a1) / 2, rm = (r1 + r2) / 2, rad = mid * Math.PI / 180, x = rm * Math.cos(rad), y = -rm * Math.sin(rad);
+      var longest = Math.max.apply(null, lines.map(function (line) { return line.length; })), size, rot = 0;
+      if (g <= 2) {
+        var width = 2 * rm * Math.sin((a0 - a1) * Math.PI / 360) * 0.85;
+        size = Math.min(g === 1 ? 30 : 26, width / (0.58 * longest), (r2 - r1) * 0.8 / (lines.length * 1.15));
+      } else {
+        lines = lines.slice(0, 1);
+        size = Math.min(22, (r2 - r1 - 10) / (0.58 * longest));
+        rot = mid > 90 ? 180 - mid : -mid;
+      }
+      if (size < 11) return '';
+      var first = -(lines.length - 1) * 0.575;
+      return '<text x="' + num(x) + '" y="' + num(y) + '" font-size="' + num(size) + '"' + (dark ? ' class="dark"' : '') +
+        (rot ? ' transform="rotate(' + num(rot) + ' ' + num(x) + ' ' + num(y) + ')"' : '') + '>' +
+        lines.map(function (line, i) { return '<tspan x="' + num(x) + '" dy="' + (i ? '1.15' : num(first)) + 'em">' + esc(line) + '</tspan>'; }).join('') + '</text>';
+    }
+    function viewFan(id) {
+      var root = P[id] ? id : viewer, tree = ancestors(root), r = fanRadii(tree.depth), body = '', count = 0;
+      fan = tree;
+      body += '<path data-slot="1" data-id="' + root + '" class="root" d="M-72 0A72 72 0 0 1 72 0Z"/>' +
+        fanLabel([root === viewer ? 'Вы' : bare(P[root].short).split(' ')[0]], 0, 62, 180, 0, 1, false);
+      Object.keys(tree.slots).map(Number).sort(function (a, b) { return a - b; }).forEach(function (s) {
+        if (s === 1) return;
+        var e = tree.slots[s], g = genOf(s), n = 1 << g, i = s - n, a0 = 180 - i * 180 / n, a1 = 180 - (i + 1) * 180 / n;
+        var cls = g === 1 ? 'par' : 'q' + ((s >> (g - 2)) - 4) + ' g' + g;
+        if (!e.id) cls += ' empty'; else if (e.hyp) cls += ' hyp';
+        if (e.id) count += 1;
+        body += '<path data-slot="' + s + '" data-id="' + e.id + '" class="' + cls + '" d="' + sector(r[g - 1], r[g], a0, a1) + '"/>';
+        var words = e.id ? bare(P[e.id].short).split(' ') : ['?'];
+        if (e.id || g <= 3) body += fanLabel(words.slice(0, 1), r[g - 1], r[g], a0, a1, g, g >= 3 || !e.id || e.hyp);
+      });
+      var h = '';
+      if (root !== viewer) h += '<p class="fan-for">Предки: <b>' + esc(P[root].name) + '</b></p>';
+      h += '<p class="count">Известно предков: ' + count + '</p>';
+      h += '<div class="fan"><svg viewBox="-505 -505 1010 515" role="img" aria-label="Веер предков">' + body + '</svg></div>';
+      h += '<div class="fan-card" id="fan-card"><span>Нажмите на любую часть веера — здесь появится, кто это. Мелкие имена можно увеличить двумя пальцами, полный список — ниже.</span></div>';
+      if (tree.depth >= 2) {
+        h += '<div class="legend">' + [4, 5, 6, 7].map(function (s, i) {
+          var e = tree.slots[s];
+          return '<span><i class="sw q' + i + '"></i>' + LINES[i] + ': ' + (e && e.id ? esc(P[e.id].short) : 'пока не знаем') + '</span>';
+        }).join('') + '<span><i class="sw pale"></i>бледнее — предположительно</span><span><i class="sw none"></i>серое — пока не знаем</span></div>';
+      }
+      for (var g = 1; g <= tree.depth; g++) {
+        var rows = '', known = 0;
+        for (var s = 1 << g; s < 2 << g; s++) {
+          var e = tree.slots[s];
+          if (!e || !e.id) continue;
+          known += 1;
+          var note = e.alts.length ? (e.alts.length === 1 ? 'один из двух' : 'один из нескольких') : (e.hyp ? 'предположительно' : '');
+          rows += personRow(e.id, joinNonEmpty([kin(e.id), note]));
+          e.alts.forEach(function (alt) { rows += personRow(alt, joinNonEmpty([kin(alt), note])); });
+        }
+        h += '<h2>' + GEN_TITLES[g] + '</h2><p class="count">Известно ' + known + ' из ' + (1 << g) + '</p><div class="list">' + rows + '</div>';
+      }
+      if (root !== viewer) h += '<a class="btn light" href="#/fan">Вернуться к своему вееру</a>';
+      return h;
+    }
+    function showSlot(s, node) {
+      var e = fan && fan.slots[s], card = document.getElementById('fan-card');
+      if (!e || !card) return;
+      Array.prototype.forEach.call(main.querySelectorAll('.fan path.sel'), function (p) { p.classList.remove('sel'); });
+      if (node.classList) node.classList.add('sel');
+      if (!e.id) {
+        card.innerHTML = '<b>Пока не знаем, кто это</b><span>Здесь должен быть ' + (s % 2 ? 'мать' : 'отец') + '. Ребёнок — ' +
+          esc(P[fan.slots[s >> 1].id].short) + '.</span><span>Если вы что-то знаете, расскажите Юре.</span>';
+        if (s % 2) card.innerHTML = card.innerHTML.replace('должен быть мать', 'должна быть мать');
+        return;
+      }
+      var p = P[e.id], note = '';
+      if (e.alts.length) note = 'Один из двух возможных. Второй — ' + e.alts.map(function (alt) { return P[alt].short; }).join(', ') + '.';
+      else if (e.hyp) note = 'Предположительно: связь не доказана документом.';
+      card.innerHTML = '<b>' + esc(p.name) + '</b><span>' + esc(joinNonEmpty([p.years, e.id === viewer ? 'это вы' : 'Вам: ' + kin(e.id)])) + '</span>' +
+        (note ? '<span class="hy">' + esc(note) + '</span>' : '') + '<a class="btn" href="#/p/' + e.id + '">Открыть страницу</a>';
+    }
+
     var observer = ('IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) { if (entry.isIntersecting) { observer.unobserve(entry.target); load(entry.target); } });
     }, { rootMargin: '400px' }) : null;
@@ -250,12 +366,13 @@
       else if (v === 'people') { main.innerHTML = viewPeople(); }
       else if (v === 'questions') { main.innerHTML = viewQuestions(); title = 'Вопросы к семье'; }
       else if (v === 'docs') { main.innerHTML = viewDocs(); title = 'Все документы'; }
+      else if (v === 'fan') { main.innerHTML = viewFan(id); title = 'Предки'; }
       else { v = 'tree'; main.innerHTML = viewTree(id); }
       hydrate();
       document.getElementById('title').textContent = title;
       document.getElementById('nav').style.display = v === 'who' ? 'none' : '';
-      ['tree', 'people', 'questions'].forEach(function (tab) { document.getElementById('tab-' + tab).className = v === tab ? 'on' : ''; });
-      document.getElementById('back').style.visibility = (v === 'who' || (v === 'tree' && (!P[id] || id === viewer))) ? 'hidden' : 'visible';
+      ['tree', 'fan', 'people', 'questions'].forEach(function (tab) { document.getElementById('tab-' + tab).className = v === tab ? 'on' : ''; });
+      document.getElementById('back').style.visibility = (v === 'who' || ((v === 'tree' || v === 'fan') && (!P[id] || id === viewer))) ? 'hidden' : 'visible';
       window.scrollTo(0, byLink ? 0 : (positions[location.hash] || 0));
       byLink = false;
       current = location.hash;
@@ -275,10 +392,11 @@
         return;
       }
       var node = t;
-      while (node && node !== main && !(node.getAttribute && node.getAttribute('data-view'))) node = node.parentNode;
+      while (node && node !== main && !(node.getAttribute && (node.getAttribute('data-view') || node.getAttribute('data-slot')))) node = node.parentNode;
       if (node && node !== main && node.getAttribute) {
         e.preventDefault();
-        openViewer(node.getAttribute('data-view'));
+        if (node.getAttribute('data-slot')) showSlot(Number(node.getAttribute('data-slot')), node);
+        else openViewer(node.getAttribute('data-view'));
         return;
       }
       if (!z) return;

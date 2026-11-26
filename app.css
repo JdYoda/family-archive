@@ -123,3 +123,31 @@ button.orig { display:block; width:100%; margin-top:14px; background:none; borde
 .viewer-body img { display:block; width:100%; height:auto; }
 img.broken { min-height:60px; background:#ddd; }
 .logout { color:var(--soft); text-decoration:underline; }
+
+/* веер предков */
+.fan { margin:6px -6px 0; }
+.fan svg { display:block; width:100%; height:auto; }
+.fan path { stroke:#fffdf8; stroke-width:2.5; cursor:pointer; }
+.fan path.root { fill:var(--accent); }
+.fan path.par { fill:#9c5a45; }
+.fan path.q0, .sw.q0 { fill:#b4613f; background:#b4613f; }
+.fan path.q1, .sw.q1 { fill:#a8812a; background:#a8812a; }
+.fan path.q2, .sw.q2 { fill:#4f7a5a; background:#4f7a5a; }
+.fan path.q3, .sw.q3 { fill:#4d6f93; background:#4d6f93; }
+.fan path.g3 { fill-opacity:.8; } .fan path.g4 { fill-opacity:.62; } .fan path.g5 { fill-opacity:.5; }
+.fan path.g6 { fill-opacity:.42; } .fan path.g7 { fill-opacity:.36; } .fan path.g8 { fill-opacity:.32; }
+.fan path.hyp { fill-opacity:.25; }
+.fan path.empty { fill:#e4dbcc; fill-opacity:1; }
+.fan path.sel { stroke:var(--ink); stroke-width:6; }
+.fan text { fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-weight:700; }
+.fan text.dark { fill:var(--ink); }
+.fan-for { margin:4px 0; }
+.fan-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:10px 0; display:flex; flex-direction:column; gap:4px; min-height:56px; }
+.fan-card span { color:var(--soft); }
+.fan-card span.hy { color:var(--hyp); }
+.fan-card .btn { margin-top:8px; }
+.legend { display:flex; flex-direction:column; gap:6px; margin:6px 0 4px; color:var(--soft); font-size:.9rem; }
+.legend span { display:flex; align-items:center; gap:8px; }
+.sw { display:inline-block; width:18px; height:18px; border-radius:4px; flex:none; }
+.sw.pale { background:#d8b9a9; } .sw.none { background:#e4dbcc; }
+nav a { font-size:16px; white-space:nowrap; padding-left:2px; padding-right:2px; }
