@@ -137,7 +137,7 @@
       if (p.docs.length) h += '<h2>Документы</h2><p class="count">Листов: ' + p.docs.length + '</p><div class="docs">' + p.docs.map(docCard).join('') + '</div>';
       if (p.unknown.length) h += '<h2>Чего мы пока не знаем</h2><ul class="unk">' + p.unknown.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
       h += '<a class="btn light" href="#/tree/' + id + '">Показать на дереве</a>';
-      if (parentRefs(id).length) h += '<a class="btn light" href="#/fan/' + id + '">Предки на веере</a>';
+      if (ancestors(id).depth > 0) h += '<a class="btn light" href="#/fan/' + id + '">Предки на веере</a>';
       h += '<p class="foot">Даты до 1918 года даны по старому стилю.</p>';
       return h;
     }
@@ -242,12 +242,27 @@
       return 'M' + pt(r2, a0) + 'A' + num(r2) + ' ' + num(r2) + ' 0 0 1 ' + pt(r2, a1) + 'L' + pt(r1, a1) +
         'A' + num(r1) + ' ' + num(r1) + ' 0 0 0 ' + pt(r1, a0) + 'Z';
     }
+    // Ширина сектора по горизонтали на высоте y вокруг точки x: ближайшие границы слева и справа.
+    function spanAt(x, y, r1, r2, a0, a1) {
+      var cuts = [], h = Math.abs(y), left = -Infinity, right = Infinity;
+      if (h < r2) { var xo = Math.sqrt(r2 * r2 - h * h); cuts.push(-xo, xo); }
+      if (h < r1) { var xi = Math.sqrt(r1 * r1 - h * h); cuts.push(-xi, xi); }
+      [a0, a1].forEach(function (a) {
+        var s = Math.sin(a * Math.PI / 180);
+        if (Math.abs(s) > 1e-6) cuts.push(-y * Math.cos(a * Math.PI / 180) / s);
+      });
+      cuts.forEach(function (c) { if (c < x && c > left) left = c; if (c > x && c < right) right = c; });
+      return right - left;
+    }
+    function centerLabel(text) {
+      return '<text x="0" y="-34" font-size="' + num(Math.min(30, 120 / (0.58 * text.length))) + '"><tspan x="0" dy="0em">' + esc(text) + '</tspan></text>';
+    }
     // Подпись сектора: в двух ближних кольцах — поперёк, дальше — вдоль радиуса. Не влезает — без подписи.
     function fanLabel(lines, r1, r2, a0, a1, g, dark) {
       var mid = (a0 + a1) / 2, rm = (r1 + r2) / 2, rad = mid * Math.PI / 180, x = rm * Math.cos(rad), y = -rm * Math.sin(rad);
       var longest = Math.max.apply(null, lines.map(function (line) { return line.length; })), size, rot = 0;
       if (g <= 2) {
-        var width = 2 * rm * Math.sin((a0 - a1) * Math.PI / 360) * 0.85;
+        var width = spanAt(x, y, r1, r2, a0, a1) * 0.9;
         size = Math.min(g === 1 ? 30 : 26, width / (0.58 * longest), (r2 - r1) * 0.8 / (lines.length * 1.15));
       } else {
         lines = lines.slice(0, 1);
@@ -261,16 +276,21 @@
         lines.map(function (line, i) { return '<tspan x="' + num(x) + '" dy="' + (i ? '1.15' : num(first)) + 'em">' + esc(line) + '</tspan>'; }).join('') + '</text>';
     }
     function viewFan(id) {
-      var root = P[id] ? id : viewer, tree = ancestors(root), r = fanRadii(tree.depth), body = '', count = 0;
+      var root = P[id] ? id : viewer, tree = ancestors(root), r = fanRadii(tree.depth), body = '', count = 0, seen = {};
       fan = tree;
+      if (!tree.depth) {
+        return (root !== viewer ? '<p class="fan-for">Предки: <b>' + esc(P[root].name) + '</b></p>' : '') +
+          '<p class="note">Предки пока не найдены. Если вы что-то знаете, расскажите Юре.</p>' +
+          (root !== viewer ? '<a class="btn light" href="#/fan">Вернуться к своему вееру</a>' : '');
+      }
       body += '<path data-slot="1" data-id="' + root + '" class="root" d="M-72 0A72 72 0 0 1 72 0Z"/>' +
-        fanLabel([root === viewer ? 'Вы' : bare(P[root].short).split(' ')[0]], 0, 62, 180, 0, 1, false);
+        centerLabel(root === viewer ? 'Вы' : bare(P[root].short).split(' ')[0]);
       Object.keys(tree.slots).map(Number).sort(function (a, b) { return a - b; }).forEach(function (s) {
         if (s === 1) return;
         var e = tree.slots[s], g = genOf(s), n = 1 << g, i = s - n, a0 = 180 - i * 180 / n, a1 = 180 - (i + 1) * 180 / n;
         var cls = g === 1 ? 'par' : 'q' + ((s >> (g - 2)) - 4) + ' g' + g;
         if (!e.id) cls += ' empty'; else if (e.hyp) cls += ' hyp';
-        if (e.id) count += 1;
+        if (e.id && !seen[e.id]) { seen[e.id] = 1; count += 1; }
         body += '<path data-slot="' + s + '" data-id="' + e.id + '" class="' + cls + '" d="' + sector(r[g - 1], r[g], a0, a1) + '"/>';
         var words = e.id ? bare(P[e.id].short).split(' ') : ['?'];
         if (e.id || g <= 3) body += fanLabel(words.slice(0, 1), r[g - 1], r[g], a0, a1, g, g >= 3 || !e.id || e.hyp);
@@ -284,7 +304,7 @@
         h += '<div class="legend">' + [4, 5, 6, 7].map(function (s, i) {
           var e = tree.slots[s];
           return '<span><i class="sw q' + i + '"></i>' + LINES[i] + ': ' + (e && e.id ? esc(P[e.id].short) : 'пока не знаем') + '</span>';
-        }).join('') + '<span><i class="sw pale"></i>бледнее — предположительно</span><span><i class="sw none"></i>серое — пока не знаем</span></div>';
+        }).join('') + '<span><i class="sw pale"></i>бледные с пунктиром — предположительно</span><span><i class="sw none"></i>серое — пока не знаем</span></div>';
       }
       for (var g = 1; g <= tree.depth; g++) {
         var rows = '', known = 0;
@@ -304,8 +324,15 @@
     function showSlot(s, node) {
       var e = fan && fan.slots[s], card = document.getElementById('fan-card');
       if (!e || !card) return;
-      Array.prototype.forEach.call(main.querySelectorAll('.fan path.sel'), function (p) { p.classList.remove('sel'); });
-      if (node.classList) node.classList.add('sel');
+      // Обводка выбранного сектора — отдельной линией поверх веера, чтобы соседи её не перекрывали.
+      Array.prototype.forEach.call(main.querySelectorAll('.fan path.outline'), function (p) { p.parentNode.removeChild(p); });
+      if (node.cloneNode) {
+        var ring = node.cloneNode(false);
+        ring.setAttribute('class', 'outline');
+        ring.removeAttribute('data-slot');
+        ring.removeAttribute('data-id');
+        node.parentNode.appendChild(ring);
+      }
       if (!e.id) {
         card.innerHTML = '<b>Пока не знаем, кто это</b><span>Здесь должен быть ' + (s % 2 ? 'мать' : 'отец') + '. Ребёнок — ' +
           esc(P[fan.slots[s >> 1].id].short) + '.</span><span>Если вы что-то знаете, расскажите Юре.</span>';
@@ -313,7 +340,8 @@
         return;
       }
       var p = P[e.id], note = '';
-      if (e.alts.length) note = 'Один из двух возможных. Второй — ' + e.alts.map(function (alt) { return P[alt].short; }).join(', ') + '.';
+      if (e.alts.length === 1) note = 'Один из двух возможных. Второй — ' + P[e.alts[0]].short + '.';
+      else if (e.alts.length) note = 'Один из нескольких возможных. Другие — ' + e.alts.map(function (alt) { return P[alt].short; }).join(', ') + '.';
       else if (e.hyp) note = 'Предположительно: связь не доказана документом.';
       card.innerHTML = '<b>' + esc(p.name) + '</b><span>' + esc(joinNonEmpty([p.years, e.id === viewer ? 'это вы' : 'Вам: ' + kin(e.id)])) + '</span>' +
         (note ? '<span class="hy">' + esc(note) + '</span>' : '') + '<a class="btn" href="#/p/' + e.id + '">Открыть страницу</a>';
@@ -325,7 +353,9 @@
     function load(img) {
       var path = img.getAttribute('data-src');
       img.removeAttribute('data-src');
-      media.url(path).then(function (url) { img.src = url; }, function () { img.className += ' broken'; img.alt = 'Не удалось открыть картинку'; });
+      function broken() { img.className += ' broken'; img.alt = 'Не удалось открыть картинку'; }
+      img.onerror = broken;
+      media.url(path).then(function (url) { img.src = url; }, broken);
     }
     function hydrate() {
       Array.prototype.forEach.call(document.querySelectorAll('#main img[data-src]'), function (img) {
@@ -333,24 +363,42 @@
       });
     }
 
-    var box = document.getElementById('viewer'), boxImg = document.getElementById('viewer-img'), boxWait = document.getElementById('viewer-wait'), boxZoom = 1;
+    var box = document.getElementById('viewer'), boxImg = document.getElementById('viewer-img'), boxWait = document.getElementById('viewer-wait'),
+      boxBody = document.getElementById('viewer-body'), boxZoom = 1, boxUrl = null, openSeq = 0, inHistory = false;
+    // Окно просмотра — отдельный шаг в истории: кнопка «Назад» телефона закрывает окно, а не уводит со страницы.
     function openViewer(path) {
+      var seq = ++openSeq;
       boxZoom = 1;
       boxImg.style.width = '100%';
       boxImg.removeAttribute('src');
       boxWait.style.display = '';
+      boxBody.scrollTop = 0;
       box.hidden = false;
       document.body.style.overflow = 'hidden';
-      media.url(path).then(function (url) { boxImg.src = url; boxWait.style.display = 'none'; },
-        function () { boxWait.textContent = 'Не удалось открыть картинку. Проверьте интернет.'; });
+      if (history.pushState && !inHistory) { history.pushState({ viewer: true }, ''); inHistory = true; }
+      media.open(path).then(function (url) {
+        if (seq !== openSeq) { media.release(url); return; }
+        boxUrl = url;
+        boxImg.src = url;
+        boxWait.style.display = 'none';
+      }, function () { if (seq === openSeq) boxWait.textContent = 'Не удалось открыть картинку. Проверьте интернет.'; });
     }
     function closeViewer() {
+      openSeq++;
       box.hidden = true;
       boxImg.removeAttribute('src');
+      if (boxUrl) { media.release(boxUrl); boxUrl = null; }
       boxWait.textContent = 'Открываю…';
       document.body.style.overflow = '';
     }
-    document.getElementById('viewer-close').addEventListener('click', closeViewer);
+    document.getElementById('viewer-close').addEventListener('click', function () {
+      if (inHistory) history.back(); else closeViewer();
+    });
+    window.addEventListener('popstate', function () {
+      if (!inHistory) return;
+      inHistory = false;
+      if (box.hidden === false) closeViewer();
+    });
     document.getElementById('viewer-zoom').addEventListener('click', function () {
       boxZoom = boxZoom >= 3 ? 1 : boxZoom + 1;
       boxImg.style.width = (boxZoom * 100) + '%';
@@ -358,7 +406,8 @@
 
     var positions = {}, current = null, byLink = false;
     function render() {
-      if (box.hidden === false) closeViewer();
+      if (box.hidden === false) { inHistory = false; closeViewer(); }
+      if (observer) observer.disconnect();
       var parts = location.hash.replace(/^#\/?/, '').split('/'), v = parts[0] || 'tree', id = parts[1], title = 'Наша семья';
       if (!viewer || v === 'who') { v = 'who'; main.innerHTML = viewWho(); }
       else if (v === 'p' && P[id]) { main.innerHTML = viewPerson(id); title = P[id].short; }
@@ -425,33 +474,45 @@
   }
 
   function plainMedia() {
-    return { encrypted: false, url: function (path) { return Promise.resolve(path); } };
+    function same(path) { return Promise.resolve(path); }
+    return { encrypted: false, url: same, open: same, release: function () {} };
   }
 
   // Картинки сайта зашифрованы: скачать, расшифровать на телефоне, показать через blob-адрес.
   function cryptoMedia(keys) {
     var cache = {}, order = [];
+    function decrypted(path) {
+      return fetch(path)
+        .then(function (r) { if (!r.ok) throw new Error('load'); return r.arrayBuffer(); })
+        .then(function (bytes) { return window.Vault.decrypt(keys, bytes); })
+        .then(function (plain) {
+          var type = plain[0] === 0x89 ? 'image/png' : 'image/jpeg';
+          return URL.createObjectURL(new Blob([plain], { type: type }));
+        });
+    }
     return {
       encrypted: true,
+      // Миниатюры и листы на страницах: кэш на 80 картинок; картинку, которая сейчас на экране, не отзываем.
       url: function (path) {
         if (cache[path]) return cache[path];
-        var promise = fetch(path)
-          .then(function (r) { if (!r.ok) throw new Error('load'); return r.arrayBuffer(); })
-          .then(function (bytes) { return window.Vault.decrypt(keys, bytes); })
-          .then(function (plain) {
-            var type = plain[0] === 0x89 ? 'image/png' : 'image/jpeg';
-            return URL.createObjectURL(new Blob([plain], { type: type }));
-          });
+        var promise = decrypted(path);
         cache[path] = promise;
         order.push(path);
-        promise.catch(function () { delete cache[path]; });
+        promise.catch(function () {
+          if (cache[path] !== promise) return;
+          delete cache[path];
+          order.splice(order.indexOf(path), 1);
+        });
         if (order.length > 80) {
           var old = order.shift(), stale = cache[old];
           delete cache[old];
-          if (stale) stale.then(function (url) { URL.revokeObjectURL(url); }, function () {});
+          if (stale) stale.then(function (url) { if (!document.querySelector('img[src="' + url + '"]')) URL.revokeObjectURL(url); }, function () {});
         }
         return promise;
-      }
+      },
+      // Окно просмотра (в том числе оригиналы по 5–10 МБ): без кэша, адрес отзывается при закрытии.
+      open: decrypted,
+      release: function (url) { URL.revokeObjectURL(url); }
     };
   }
 

@@ -136,9 +136,9 @@ img.broken { min-height:60px; background:#ddd; }
 .fan path.q3, .sw.q3 { fill:#4d6f93; background:#4d6f93; }
 .fan path.g3 { fill-opacity:.8; } .fan path.g4 { fill-opacity:.62; } .fan path.g5 { fill-opacity:.5; }
 .fan path.g6 { fill-opacity:.42; } .fan path.g7 { fill-opacity:.36; } .fan path.g8 { fill-opacity:.32; }
-.fan path.hyp { fill-opacity:.25; }
+.fan path.hyp { fill-opacity:.25; stroke:var(--hyp); stroke-dasharray:8 6; }
 .fan path.empty { fill:#e4dbcc; fill-opacity:1; }
-.fan path.sel { stroke:var(--ink); stroke-width:6; }
+.fan path.outline { fill:none; stroke:var(--ink); stroke-width:6; pointer-events:none; }
 .fan text { fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-weight:700; }
 .fan text.dark { fill:var(--ink); }
 .fan-for { margin:4px 0; }
@@ -149,5 +149,5 @@ img.broken { min-height:60px; background:#ddd; }
 .legend { display:flex; flex-direction:column; gap:6px; margin:6px 0 4px; color:var(--soft); font-size:.9rem; }
 .legend span { display:flex; align-items:center; gap:8px; }
 .sw { display:inline-block; width:18px; height:18px; border-radius:4px; flex:none; }
-.sw.pale { background:#d8b9a9; } .sw.none { background:#e4dbcc; }
+.sw.pale { background:#eadbd0; border:2px dashed var(--hyp); box-sizing:border-box; } .sw.none { background:#e4dbcc; }
 nav a { font-size:16px; white-space:nowrap; padding-left:2px; padding-right:2px; }
